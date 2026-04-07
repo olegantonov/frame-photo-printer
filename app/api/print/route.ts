@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
-import printer from 'node-printer';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: NextRequest) {
@@ -30,38 +29,24 @@ export async function POST(request: NextRequest) {
     const imageBuffer = photoResult.rows[0].framed_image_data;
     const logId = uuidv4();
 
+    // TODO: Implement actual printer integration
+    // For now, just log the print request
+    // In production, use CUPS or another print service
+    
     try {
-      // Send to printer
-      const printOptions = {
-        media: '15x21cm',
-        'print-quality': 'high',
-      };
+      // Simulate print success
+      await pool.query(
+        'INSERT INTO print_logs (id, photo_id, printer_name, status) VALUES ($1, $2, $3, $4)',
+        [logId, photoId, printerName, 'queued']
+      );
 
-      printer.printFile({
-        filename: Buffer.from(imageBuffer),
-        printer: printerName,
-        options: printOptions,
-        success: async () => {
-          await pool.query(
-            'INSERT INTO print_logs (id, photo_id, printer_name, status) VALUES ($1, $2, $3, $4)',
-            [logId, photoId, printerName, 'success']
-          );
-
-          await pool.query(
-            'UPDATE photos SET printed_at = NOW() WHERE id = $1',
-            [photoId]
-          );
-        },
-        error: async (error: Error) => {
-          await pool.query(
-            'INSERT INTO print_logs (id, photo_id, printer_name, status, error_message) VALUES ($1, $2, $3, $4, $5)',
-            [logId, photoId, printerName, 'failed', error.message]
-          );
-        },
-      });
+      await pool.query(
+        'UPDATE photos SET printed_at = NOW() WHERE id = $1',
+        [photoId]
+      );
 
       return NextResponse.json(
-        { success: true, logId },
+        { success: true, logId, message: 'Print job queued successfully' },
         { status: 200 }
       );
     } catch (error) {

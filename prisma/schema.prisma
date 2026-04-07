@@ -1,0 +1,84 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password_hash String
+  role          String   @default("operator") // "admin" or "operator"
+  name          String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  print_logs    PrintLog[]
+  
+  @@map("users")
+}
+
+model Photo {
+  id                  String    @id @default(uuid())
+  image_data          Bytes
+  orientation         String    // "portrait" or "landscape"
+  frame_applied       Boolean   @default(false)
+  framed_image_data   Bytes?
+  created_at          DateTime  @default(now())
+  printed_at          DateTime?
+  metadata            Json      @default("{}")
+  
+  print_logs          PrintLog[]
+  
+  @@index([created_at])
+  @@index([printed_at])
+  @@map("photos")
+}
+
+model PrinterConfig {
+  id         String    @id @default(uuid())
+  name       String    @unique
+  driver     String?
+  status     String    @default("idle")
+  last_used  DateTime?
+  created_at DateTime  @default(now())
+  
+  @@map("printer_config")
+}
+
+model PrintLog {
+  id            String   @id @default(uuid())
+  photo_id      String
+  printer_name  String
+  status        String   @default("pending") // "pending" | "printing" | "success" | "failed"
+  error_message String?
+  printed_at    DateTime @default(now())
+  user_id       String?
+  
+  photo         Photo    @relation(fields: [photo_id], references: [id], onDelete: Cascade)
+  user          User?    @relation(fields: [user_id], references: [id])
+  
+  @@index([photo_id])
+  @@index([status])
+  @@index([user_id])
+  @@map("print_logs")
+}
+
+model Frame {
+  id         String   @id @default(uuid())
+  name       String
+  width_mm   Float
+  height_mm  Float
+  border_px  Int      @default(40)
+  image_url  String?
+  active     Boolean  @default(true)
+  created_at DateTime @default(now())
+  
+  @@map("frames")
+}

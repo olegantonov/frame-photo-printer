@@ -19,6 +19,7 @@ export default function PrinterSettings({
         setPrinters(data);
         if (data.length > 0) {
           setSelectedPrinter(data[0].name);
+          onPrinterSelected(data[0].name); // Auto-select first printer
         }
       } catch (error) {
         console.error('Failed to fetch printers:', error);
@@ -28,7 +29,7 @@ export default function PrinterSettings({
     };
 
     fetchPrinters();
-  }, []);
+  }, [onPrinterSelected]);
 
   const handlePrinterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const printer = e.target.value;

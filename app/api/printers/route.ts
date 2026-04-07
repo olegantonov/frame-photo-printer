@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import printer from 'node-printer';
 
 export async function GET() {
   try {
-    const printers = printer.getPrinters();
+    // TODO: Implement actual printer discovery
+    // For now, return mock printers
+    // In production, integrate with CUPS or other print system
+    
+    const mockPrinters = [
+      {
+        name: 'Default Printer',
+        status: 'idle',
+        isDefault: true,
+      },
+    ];
 
-    const printerList = printers.map(p => ({
-      name: p.name,
-      status: 'idle',
-      isDefault: p.default || false,
-    }));
-
-    return NextResponse.json(printerList, { status: 200 });
+    return NextResponse.json(mockPrinters, { status: 200 });
   } catch (error) {
     console.error('Error fetching printers:', error);
     return NextResponse.json(

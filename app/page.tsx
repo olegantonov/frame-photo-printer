@@ -81,20 +81,20 @@ export default function Home() {
         {step === 'printer' && (
           <>
             <PrinterSettings onPrinterSelected={handlePrinterSelected} />
-            <div className="button-group" style={{ marginTop: '2rem', justifyContent: 'center' }}>
+            <div className="button-group" style={{ marginTop: '2rem' }}>
               <button
                 onClick={() => setStep('camera')}
-                className="btn btn-secondary"
+                className="btn btn-secondary btn-large"
                 disabled={isLoading}
               >
-                Voltar
+                ⬅️ Voltar
               </button>
               <button
                 onClick={handlePrint}
-                className="btn btn-success"
+                className="btn btn-success btn-large"
                 disabled={!selectedPrinter || isLoading}
               >
-                {isLoading ? 'Enviando...' : 'Imprimir'}
+                {isLoading ? '⏳ Enviando...' : '🖨️ Imprimir'}
               </button>
             </div>
           </>

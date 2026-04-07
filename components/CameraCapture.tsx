@@ -10,11 +10,16 @@ export default function CameraCapture({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
 
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' },
+        video: { 
+          facingMode: facingMode,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -32,6 +37,12 @@ export default function CameraCapture({
       tracks.forEach(track => track.stop());
       setIsCameraActive(false);
     }
+  };
+
+  const toggleCamera = async () => {
+    stopCamera();
+    setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
+    setTimeout(() => startCamera(), 200);
   };
 
   const capturePhoto = async () => {
@@ -80,11 +91,14 @@ export default function CameraCapture({
           />
           <canvas ref={canvasRef} hidden />
           <div className="button-group">
-            <button onClick={capturePhoto} className="btn btn-success">
-              Capturar Foto
+            <button onClick={capturePhoto} className="btn btn-success btn-large">
+              📸 Capturar Foto
             </button>
-            <button onClick={stopCamera} className="btn btn-secondary">
-              Cancelar
+            <button onClick={toggleCamera} className="btn btn-primary btn-large">
+              🔄 Trocar Câmera
+            </button>
+            <button onClick={stopCamera} className="btn btn-secondary btn-large">
+              ❌ Cancelar
             </button>
           </div>
         </>

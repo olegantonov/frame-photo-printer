@@ -11,17 +11,17 @@ export default function FrameSelector({
       <div className="orientation-buttons">
         <button
           onClick={() => onOrientationSelected('portrait')}
-          className="btn btn-outline orientation-btn portrait"
+          className="btn btn-outline orientation-btn portrait btn-large"
         >
           <div className="frame-preview portrait-preview" />
-          Retrato (15x21)
+          📱 Retrato (15x21)
         </button>
         <button
           onClick={() => onOrientationSelected('landscape')}
-          className="btn btn-outline orientation-btn landscape"
+          className="btn btn-outline orientation-btn landscape btn-large"
         >
           <div className="frame-preview landscape-preview" />
-          Paisagem (21x15)
+          🖼️ Paisagem (21x15)
         </button>
       </div>
     </div>
