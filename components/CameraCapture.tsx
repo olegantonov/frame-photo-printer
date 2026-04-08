@@ -26,6 +26,7 @@ export default function CameraCapture({
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        await videoRef.current.play();
         setIsCameraActive(true);
       }
     } catch (err) {
@@ -58,6 +59,7 @@ export default function CameraCapture({
         });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          await videoRef.current.play();
           setIsCameraActive(true);
         }
       } catch (err) {
