@@ -1,17 +1,37 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import CameraCapture from '@/components/CameraCapture';
-import PrinterSettings from '@/components/PrinterSettings';
 
 export default function Home() {
   const [step, setStep] = useState<'camera' | 'preview' | 'printing'>('camera');
   const [photoId, setPhotoId] = useState('');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [previewUrl, setPreviewUrl] = useState('');
-  const [selectedPrinter, setSelectedPrinter] = useState('');
+  const [defaultPrinter, setDefaultPrinter] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [configLoading, setConfigLoading] = useState(true);
+
+  useEffect(() => {
+    // Load system config to get default printer
+    const loadConfig = async () => {
+      try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+          const config = await response.json();
+          if (config.default_printer) {
+            setDefaultPrinter(config.default_printer);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load config:', error);
+      } finally {
+        setConfigLoading(false);
+      }
+    };
+    loadConfig();
+  }, []);
 
   const handlePhotoCaptured = async (id: string, orient: string, preview: string) => {
     setPhotoId(id);
@@ -21,13 +41,9 @@ export default function Home() {
     setStep('preview');
   };
 
-  const handlePrinterSelected = (printerName: string) => {
-    setSelectedPrinter(printerName);
-  };
-
   const handlePrint = async () => {
-    if (!selectedPrinter || selectedPrinter.includes('Nenhuma')) {
-      setMessage('⚠️ Selecione uma impressora válida');
+    if (!defaultPrinter) {
+      setMessage('⚠️ Nenhuma impressora configurada. Acesse /admin para configurar.');
       return;
     }
 
@@ -38,7 +54,7 @@ export default function Home() {
       const response = await fetch('/api/print', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photoId, printerName: selectedPrinter }),
+        body: JSON.stringify({ photoId, printerName: defaultPrinter }),
       });
 
       const data = await response.json();
@@ -66,12 +82,32 @@ export default function Home() {
     setMessage('');
   };
 
+  if (configLoading) {
+    return (
+      <main className="app-container">
+        <div className="loading-screen">
+          <div className="spinner"></div>
+          <p>Carregando configurações...</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="app-container">
       <header className="app-header">
         <h1>📸 Frame Photo Printer</h1>
         <p className="subtitle">Capture, enquadre e imprima suas fotos 15x21</p>
+        {defaultPrinter && (
+          <p className="printer-badge">🖨️ {defaultPrinter}</p>
+        )}
       </header>
+
+      {!defaultPrinter && (
+        <div className="message-banner warning">
+          ⚠️ Nenhuma impressora configurada. <a href="/admin">Clique aqui para configurar</a>
+        </div>
+      )}
 
       {message && (
         <div className={`message-banner ${message.includes('✅') ? 'success' : message.includes('❌') ? 'error' : 'info'}`}>
@@ -100,25 +136,21 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="print-section">
-              <PrinterSettings onPrinterSelected={handlePrinterSelected} />
-              
-              <div className="action-buttons">
-                <button
-                  onClick={resetToCamera}
-                  className="btn btn-secondary btn-large"
-                  disabled={isLoading}
-                >
-                  🔄 Nova Foto
-                </button>
-                <button
-                  onClick={handlePrint}
-                  className="btn btn-success btn-large"
-                  disabled={!selectedPrinter || isLoading}
-                >
-                  {isLoading ? '⏳ Imprimindo...' : '🖨️ Imprimir'}
-                </button>
-              </div>
+            <div className="action-buttons-vertical">
+              <button
+                onClick={handlePrint}
+                className="btn btn-success btn-xlarge"
+                disabled={!defaultPrinter || isLoading}
+              >
+                {isLoading ? '⏳ Imprimindo...' : '🖨️ IMPRIMIR'}
+              </button>
+              <button
+                onClick={resetToCamera}
+                className="btn btn-secondary btn-large"
+                disabled={isLoading}
+              >
+                🔄 Nova Foto
+              </button>
             </div>
           </div>
         )}

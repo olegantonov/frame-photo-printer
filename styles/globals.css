@@ -66,6 +66,16 @@ body {
   font-size: 0.95rem;
 }
 
+.app-header .printer-badge {
+  display: inline-block;
+  background: var(--color-surface-light);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  color: var(--color-success);
+  margin-top: 0.5rem;
+}
+
 .main-content {
   flex: 1;
   display: flex;
@@ -108,6 +118,17 @@ body {
   color: var(--color-primary);
 }
 
+.message-banner.warning {
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid #f59e0b;
+  color: #f59e0b;
+}
+
+.message-banner.warning a {
+  color: #fbbf24;
+  text-decoration: underline;
+}
+
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -142,6 +163,14 @@ body {
   font-size: 18px;
   min-height: 56px;
   border-radius: var(--radius-lg);
+}
+
+.btn-xlarge {
+  padding: 24px 48px;
+  font-size: 22px;
+  min-height: 72px;
+  border-radius: var(--radius-lg);
+  width: 100%;
 }
 
 .btn-primary {
@@ -354,6 +383,36 @@ body {
 
 .action-buttons .btn {
   flex: 1;
+}
+
+.action-buttons-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-lg);
+}
+
+/* Loading Screen */
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  gap: 1rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-surface-light);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* Printer Settings */

@@ -82,3 +82,14 @@ model Frame {
   
   @@map("frames")
 }
+
+model SystemConfig {
+  id         String   @id @default("system")
+  default_printer String?
+  hotspot_enabled Boolean @default(false)
+  hotspot_ssid    String  @default("FramePhotoPrinter")
+  hotspot_password String @default("foto1234")
+  updated_at DateTime @updatedAt
+  
+  @@map("system_config")
+}
