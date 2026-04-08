@@ -1,17 +1,9 @@
 import sharp from 'sharp';
-
-export interface FrameOptions {
-  width: number;
-  height: number;
-  borderSize: number;
-  backgroundColor?: string;
-  showId?: boolean;
-  showDateTime?: boolean;
-}
+import path from 'path';
+import { promises as fs } from 'fs';
 
 export interface FrameConfig {
-  frame_border_size: number;
-  frame_bg_color: string;
+  frame_image: string | null;
   frame_show_id: boolean;
   frame_show_datetime: boolean;
 }
@@ -63,73 +55,125 @@ function createTextOverlay(photoId: string, dateTime: string, width: number, sho
   return Buffer.from(svg);
 }
 
-function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result ? {
-    r: parseInt(result[1], 16),
-    g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16)
-  } : { r: 255, g: 255, b: 255 };
-}
-
 export async function applyFrame(
   imageBuffer: Buffer,
   orientation: 'portrait' | 'landscape',
   config?: FrameConfig
 ): Promise<Buffer> {
-  const borderSize = config?.frame_border_size ?? 40;
-  const bgColor = config?.frame_bg_color ?? '#FFFFFF';
   const showId = config?.frame_show_id ?? true;
   const showDateTime = config?.frame_show_datetime ?? true;
+  const frameImagePath = config?.frame_image;
   
-  const rgb = hexToRgb(bgColor);
-  
-  const frameOptions: FrameOptions = {
-    borderSize,
-    backgroundColor: bgColor,
-    width: orientation === 'portrait' ? 1500 : 2100,
-    height: orientation === 'portrait' ? 2100 : 1500,
-    showId,
-    showDateTime,
-  };
+  // Final dimensions for 15x21cm at 100 DPI
+  const frameWidth = orientation === 'portrait' ? 1500 : 2100;
+  const frameHeight = orientation === 'portrait' ? 2100 : 1500;
 
   const photoId = generatePhotoId();
   const dateTime = formatDateTime();
-  const textOverlay = createTextOverlay(photoId, dateTime, frameOptions.width, showId, showDateTime);
+  const textOverlay = createTextOverlay(photoId, dateTime, frameWidth, showId, showDateTime);
 
-  // Create framed image
-  const framedImage = await sharp(imageBuffer)
-    .resize(frameOptions.width - frameOptions.borderSize * 2, frameOptions.height - frameOptions.borderSize * 2, {
-      fit: 'contain',
-      background: { r: rgb.r, g: rgb.g, b: rgb.b, alpha: 1 },
-    })
-    .extend({
-      top: frameOptions.borderSize,
-      bottom: frameOptions.borderSize,
-      left: frameOptions.borderSize,
-      right: frameOptions.borderSize,
-      background: { r: rgb.r, g: rgb.g, b: rgb.b, alpha: 1 },
-    })
-    .png()
-    .toBuffer();
-
-  // If no text overlay, return framed image
-  if (!textOverlay) {
-    return framedImage;
+  // Check if frame image exists
+  let frameBuffer: Buffer | null = null;
+  if (frameImagePath) {
+    try {
+      const fullFramePath = path.join(process.cwd(), 'public', frameImagePath);
+      frameBuffer = await fs.readFile(fullFramePath);
+    } catch (error) {
+      console.error('Failed to load frame image:', error);
+    }
   }
 
-  // Get text overlay dimensions and composite
-  const textMeta = await sharp(textOverlay).metadata();
-  const textWidth = textMeta.width || 150;
+  if (frameBuffer) {
+    // PNG Frame overlay mode: photo behind, frame on top
+    // Get frame dimensions
+    const frameMeta = await sharp(frameBuffer).metadata();
+    const actualFrameWidth = frameMeta.width || frameWidth;
+    const actualFrameHeight = frameMeta.height || frameHeight;
 
-  return sharp(framedImage)
-    .composite([{
-      input: textOverlay,
-      top: 8,
-      left: frameOptions.width - textWidth - 8,
-    }])
-    .png()
-    .toBuffer();
+    // Resize photo to fit within frame (with some padding for the frame border)
+    const paddingPercent = 0.05; // 5% padding on each side for frame border
+    const photoWidth = Math.floor(actualFrameWidth * (1 - paddingPercent * 2));
+    const photoHeight = Math.floor(actualFrameHeight * (1 - paddingPercent * 2));
+
+    const resizedPhoto = await sharp(imageBuffer)
+      .resize(photoWidth, photoHeight, { fit: 'cover' })
+      .toBuffer();
+
+    // Create base canvas with white background
+    let result = await sharp({
+      create: {
+        width: actualFrameWidth,
+        height: actualFrameHeight,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 }
+      }
+    })
+      .composite([
+        // Photo centered behind frame
+        {
+          input: resizedPhoto,
+          gravity: 'center'
+        },
+        // Frame overlay on top
+        {
+          input: frameBuffer,
+          gravity: 'center'
+        }
+      ])
+      .png()
+      .toBuffer();
+
+    // Add text overlay if needed
+    if (textOverlay) {
+      const textMeta = await sharp(textOverlay).metadata();
+      const textWidth = textMeta.width || 150;
+      
+      result = await sharp(result)
+        .composite([{
+          input: textOverlay,
+          top: 8,
+          left: actualFrameWidth - textWidth - 8,
+        }])
+        .png()
+        .toBuffer();
+    }
+
+    return result;
+  } else {
+    // Fallback: simple white border mode
+    const borderSize = 40;
+    
+    const framedImage = await sharp(imageBuffer)
+      .resize(frameWidth - borderSize * 2, frameHeight - borderSize * 2, {
+        fit: 'cover',
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      })
+      .extend({
+        top: borderSize,
+        bottom: borderSize,
+        left: borderSize,
+        right: borderSize,
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      })
+      .png()
+      .toBuffer();
+
+    if (!textOverlay) {
+      return framedImage;
+    }
+
+    const textMeta = await sharp(textOverlay).metadata();
+    const textWidth = textMeta.width || 150;
+
+    return sharp(framedImage)
+      .composite([{
+        input: textOverlay,
+        top: 8,
+        left: frameWidth - textWidth - 8,
+      }])
+      .png()
+      .toBuffer();
+  }
 }
 
 export async function detectImageOrientation(

@@ -31,8 +31,7 @@ export async function PUT(request: NextRequest) {
       hotspot_enabled, 
       hotspot_ssid, 
       hotspot_password,
-      frame_border_size,
-      frame_bg_color,
+      frame_image,
       frame_show_id,
       frame_show_datetime
     } = body;
@@ -44,8 +43,7 @@ export async function PUT(request: NextRequest) {
         ...(hotspot_enabled !== undefined && { hotspot_enabled }),
         ...(hotspot_ssid !== undefined && { hotspot_ssid }),
         ...(hotspot_password !== undefined && { hotspot_password }),
-        ...(frame_border_size !== undefined && { frame_border_size }),
-        ...(frame_bg_color !== undefined && { frame_bg_color }),
+        ...(frame_image !== undefined && { frame_image }),
         ...(frame_show_id !== undefined && { frame_show_id }),
         ...(frame_show_datetime !== undefined && { frame_show_datetime }),
       },
@@ -55,8 +53,7 @@ export async function PUT(request: NextRequest) {
         hotspot_enabled: hotspot_enabled ?? false,
         hotspot_ssid: hotspot_ssid ?? 'FramePhotoPrinter',
         hotspot_password: hotspot_password ?? 'foto1234',
-        frame_border_size: frame_border_size ?? 40,
-        frame_bg_color: frame_bg_color ?? '#FFFFFF',
+        frame_image: frame_image ?? null,
         frame_show_id: frame_show_id ?? true,
         frame_show_datetime: frame_show_datetime ?? true,
       }

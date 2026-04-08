@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
 
     const imageBuffer = photoResult.rows[0].image_data;
 
-    // Apply frame
-    const framedImageBuffer = await applyFrame(imageBuffer, orientation, 40);
+    // Apply frame with default config
+    const framedImageBuffer = await applyFrame(imageBuffer, orientation);
 
     // Save framed image
     await pool.query(

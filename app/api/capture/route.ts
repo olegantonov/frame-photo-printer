@@ -23,8 +23,7 @@ export async function POST(request: NextRequest) {
       });
       if (config) {
         frameConfig = {
-          frame_border_size: config.frame_border_size,
-          frame_bg_color: config.frame_bg_color,
+          frame_image: config.frame_image,
           frame_show_id: config.frame_show_id,
           frame_show_datetime: config.frame_show_datetime,
         };

@@ -126,7 +126,6 @@ export default function AdminFrames() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: frame.id,
           ...frame,
           active: !frame.active,
         }),

@@ -17,13 +17,18 @@ interface HotspotStatus {
   clients?: number;
 }
 
+interface FrameOption {
+  name: string;
+  path: string;
+  displayName: string;
+}
+
 interface SystemConfig {
   default_printer: string | null;
   hotspot_enabled: boolean;
   hotspot_ssid: string;
   hotspot_password: string;
-  frame_border_size: number;
-  frame_bg_color: string;
+  frame_image: string | null;
   frame_show_id: boolean;
   frame_show_datetime: boolean;
 }
@@ -36,10 +41,11 @@ export default function SettingsPage() {
   const [ssid, setSsid] = useState('FramePhotoPrinter');
   const [password, setPassword] = useState('foto1234');
   // Frame settings
-  const [borderSize, setBorderSize] = useState(40);
-  const [bgColor, setBgColor] = useState('#FFFFFF');
+  const [frames, setFrames] = useState<FrameOption[]>([]);
+  const [selectedFrame, setSelectedFrame] = useState<string | null>(null);
   const [showId, setShowId] = useState(true);
   const [showDateTime, setShowDateTime] = useState(true);
+  const [uploadingFrame, setUploadingFrame] = useState(false);
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,10 +55,11 @@ export default function SettingsPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [printersRes, configRes, hotspotRes] = await Promise.all([
+      const [printersRes, configRes, hotspotRes, framesRes] = await Promise.all([
         fetch('/api/printers'),
         fetch('/api/config'),
-        fetch('/api/hotspot')
+        fetch('/api/hotspot'),
+        fetch('/api/frames')
       ]);
 
       if (printersRes.ok) {
@@ -66,8 +73,7 @@ export default function SettingsPage() {
         setSelectedPrinter(data.default_printer || '');
         setSsid(data.hotspot_ssid || 'FramePhotoPrinter');
         setPassword(data.hotspot_password || 'foto1234');
-        setBorderSize(data.frame_border_size ?? 40);
-        setBgColor(data.frame_bg_color || '#FFFFFF');
+        setSelectedFrame(data.frame_image || null);
         setShowId(data.frame_show_id ?? true);
         setShowDateTime(data.frame_show_datetime ?? true);
       }
@@ -75,6 +81,11 @@ export default function SettingsPage() {
       if (hotspotRes.ok) {
         const data = await hotspotRes.json();
         setHotspotStatus(data);
+      }
+
+      if (framesRes.ok) {
+        const data = await framesRes.json();
+        setFrames(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -119,8 +130,7 @@ export default function SettingsPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          frame_border_size: borderSize,
-          frame_bg_color: bgColor,
+          frame_image: selectedFrame,
           frame_show_id: showId,
           frame_show_datetime: showDateTime
         })
@@ -136,6 +146,56 @@ export default function SettingsPage() {
       setMessage('❌ Erro ao salvar moldura');
     } finally {
       setSavingFrame(false);
+    }
+  };
+
+  const uploadFrame = async (file: File) => {
+    setUploadingFrame(true);
+    setMessage('');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/frames', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMessage('✅ Moldura enviada com sucesso!');
+        setSelectedFrame(data.frame.path);
+        fetchData();
+      } else {
+        const data = await response.json();
+        setMessage(`❌ ${data.error || 'Erro ao enviar moldura'}`);
+      }
+    } catch (error) {
+      setMessage('❌ Erro ao enviar moldura');
+    } finally {
+      setUploadingFrame(false);
+    }
+  };
+
+  const deleteFrame = async (frameName: string) => {
+    if (!confirm(`Deseja excluir a moldura "${frameName}"?`)) return;
+    
+    try {
+      const response = await fetch(`/api/frames?name=${encodeURIComponent(frameName)}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        setMessage('✅ Moldura excluída!');
+        if (selectedFrame === `/frames/${frameName}`) {
+          setSelectedFrame(null);
+        }
+        fetchData();
+      } else {
+        setMessage('❌ Erro ao excluir moldura');
+      }
+    } catch (error) {
+      setMessage('❌ Erro ao excluir moldura');
     }
   };
 
@@ -260,16 +320,24 @@ export default function SettingsPage() {
         <section className="settings-card">
           <h2>🖼️ Configuração da Moldura</h2>
           <p className="settings-description">
-            Configure a aparência da moldura aplicada às fotos (formato 15×21cm).
+            Selecione ou envie uma moldura PNG com fundo transparente (formato 15×21cm recomendado).
           </p>
 
-          <div className="frame-preview" style={{ 
-            border: `${Math.min(borderSize / 4, 20)}px solid ${bgColor}`,
-            backgroundColor: bgColor
-          }}>
-            <div className="preview-photo">
-              <span>📷 Foto</span>
-            </div>
+          {/* Frame Preview */}
+          <div className="frame-preview-container">
+            {selectedFrame ? (
+              <div className="frame-preview-image">
+                <img src={selectedFrame} alt="Moldura selecionada" />
+                <div className="preview-photo-placeholder">📷</div>
+              </div>
+            ) : (
+              <div className="frame-preview no-frame">
+                <div className="preview-photo">
+                  <span>📷 Foto</span>
+                </div>
+                <p className="no-frame-text">Nenhuma moldura selecionada (borda branca simples)</p>
+              </div>
+            )}
             {(showId || showDateTime) && (
               <div className="preview-overlay">
                 {showId && 'ABC123'}{showId && showDateTime && ' | '}{showDateTime && '08/04/2026 12:00'}
@@ -277,40 +345,60 @@ export default function SettingsPage() {
             )}
           </div>
 
+          {/* Available Frames */}
           <div className="frame-settings">
             <div className="form-group">
-              <label>Tamanho da Borda (px)</label>
-              <div className="range-group">
-                <input
-                  type="range"
-                  min="10"
-                  max="100"
-                  value={borderSize}
-                  onChange={(e) => setBorderSize(Number(e.target.value))}
-                />
-                <span className="range-value">{borderSize}px</span>
+              <label>Molduras Disponíveis</label>
+              <div className="frames-grid">
+                <label 
+                  className={`frame-option ${!selectedFrame ? 'selected' : ''}`}
+                  onClick={() => setSelectedFrame(null)}
+                >
+                  <div className="frame-thumb no-frame-thumb">
+                    <span>Sem moldura</span>
+                  </div>
+                </label>
+                {frames.map(frame => (
+                  <label 
+                    key={frame.name}
+                    className={`frame-option ${selectedFrame === frame.path ? 'selected' : ''}`}
+                  >
+                    <img 
+                      src={frame.path} 
+                      alt={frame.displayName}
+                      onClick={() => setSelectedFrame(frame.path)}
+                    />
+                    <span className="frame-name">{frame.displayName}</span>
+                    <button 
+                      className="delete-frame-btn"
+                      onClick={(e) => { e.stopPropagation(); deleteFrame(frame.name); }}
+                      title="Excluir moldura"
+                    >
+                      🗑️
+                    </button>
+                  </label>
+                ))}
               </div>
             </div>
 
+            {/* Upload Frame */}
             <div className="form-group">
-              <label>Cor de Fundo</label>
-              <div className="color-options">
-                {['#FFFFFF', '#000000', '#F5F5DC', '#FFE4E1', '#E6E6FA', '#F0FFF0'].map(color => (
-                  <button
-                    key={color}
-                    className={`color-btn ${bgColor === color ? 'selected' : ''}`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setBgColor(color)}
-                    title={color}
-                  />
-                ))}
+              <label>Enviar Nova Moldura</label>
+              <div className="upload-area">
                 <input
-                  type="color"
-                  value={bgColor}
-                  onChange={(e) => setBgColor(e.target.value)}
-                  className="color-picker"
-                  title="Cor personalizada"
+                  type="file"
+                  accept=".png"
+                  id="frame-upload"
+                  className="file-input"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadFrame(file);
+                  }}
+                  disabled={uploadingFrame}
                 />
+                <label htmlFor="frame-upload" className="upload-label">
+                  {uploadingFrame ? '⏳ Enviando...' : '📤 Selecionar arquivo PNG'}
+                </label>
               </div>
             </div>
 
@@ -599,14 +687,53 @@ export default function SettingsPage() {
         }
 
         /* Frame Settings Styles */
+        .frame-preview-container {
+          position: relative;
+          margin-bottom: 1.5rem;
+        }
+
+        .frame-preview-image {
+          position: relative;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          background: #0f172a;
+          border-radius: 8px;
+          padding: 1rem;
+          min-height: 200px;
+        }
+
+        .frame-preview-image img {
+          max-width: 180px;
+          max-height: 250px;
+          object-fit: contain;
+        }
+
+        .preview-photo-placeholder {
+          position: absolute;
+          font-size: 3rem;
+          z-index: 0;
+          opacity: 0.5;
+        }
+
         .frame-preview {
           border-radius: 8px;
           padding: 1rem;
-          margin-bottom: 1.5rem;
           display: flex;
           flex-direction: column;
           align-items: center;
           position: relative;
+          background: #0f172a;
+        }
+
+        .frame-preview.no-frame {
+          border: 3px dashed #475569;
+        }
+
+        .no-frame-text {
+          margin-top: 0.5rem;
+          color: #64748b;
+          font-size: 0.85rem;
         }
 
         .preview-photo {
@@ -623,11 +750,121 @@ export default function SettingsPage() {
 
         .preview-overlay {
           position: absolute;
-          top: 8px;
-          right: 12px;
+          top: 16px;
+          right: 20px;
           font-size: 10px;
           color: #888;
           font-family: Arial, sans-serif;
+        }
+
+        .frames-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+          gap: 1rem;
+          margin-top: 0.5rem;
+        }
+
+        .frame-option {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 0.75rem;
+          background: #334155;
+          border-radius: 12px;
+          cursor: pointer;
+          border: 2px solid transparent;
+          transition: all 0.2s;
+        }
+
+        .frame-option:hover {
+          background: #3b4d63;
+        }
+
+        .frame-option.selected {
+          border-color: #3b82f6;
+          background: rgba(59, 130, 246, 0.1);
+        }
+
+        .frame-option img {
+          max-width: 100px;
+          max-height: 140px;
+          object-fit: contain;
+          border-radius: 4px;
+        }
+
+        .frame-thumb {
+          width: 100px;
+          height: 140px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #1e293b;
+          border-radius: 4px;
+          border: 2px dashed #475569;
+        }
+
+        .no-frame-thumb span {
+          color: #64748b;
+          font-size: 0.75rem;
+          text-align: center;
+        }
+
+        .frame-name {
+          margin-top: 0.5rem;
+          font-size: 0.75rem;
+          color: #94a3b8;
+          text-align: center;
+          max-width: 100px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .delete-frame-btn {
+          position: absolute;
+          top: 4px;
+          right: 4px;
+          background: rgba(239, 68, 68, 0.8);
+          border: none;
+          border-radius: 50%;
+          width: 24px;
+          height: 24px;
+          font-size: 12px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          opacity: 0;
+          transition: opacity 0.2s;
+        }
+
+        .frame-option:hover .delete-frame-btn {
+          opacity: 1;
+        }
+
+        .upload-area {
+          margin-top: 0.5rem;
+        }
+
+        .file-input {
+          display: none;
+        }
+
+        .upload-label {
+          display: inline-block;
+          padding: 0.75rem 1.5rem;
+          background: #334155;
+          border: 2px dashed #475569;
+          border-radius: 12px;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-size: 0.9rem;
+        }
+
+        .upload-label:hover {
+          background: #3b4d63;
+          border-color: #3b82f6;
         }
 
         .frame-settings {
@@ -635,71 +872,6 @@ export default function SettingsPage() {
           flex-direction: column;
           gap: 1.5rem;
           margin-bottom: 1.5rem;
-        }
-
-        .range-group {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-        }
-
-        .range-group input[type="range"] {
-          flex: 1;
-          height: 8px;
-          background: #334155;
-          border-radius: 4px;
-          -webkit-appearance: none;
-          padding: 0;
-        }
-
-        .range-group input[type="range"]::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          width: 20px;
-          height: 20px;
-          background: #3b82f6;
-          border-radius: 50%;
-          cursor: pointer;
-        }
-
-        .range-value {
-          min-width: 50px;
-          text-align: right;
-          font-weight: 600;
-          color: #3b82f6;
-        }
-
-        .color-options {
-          display: flex;
-          gap: 0.5rem;
-          flex-wrap: wrap;
-          align-items: center;
-        }
-
-        .color-btn {
-          width: 36px;
-          height: 36px;
-          border-radius: 8px;
-          border: 2px solid transparent;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .color-btn:hover {
-          transform: scale(1.1);
-        }
-
-        .color-btn.selected {
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
-        }
-
-        .color-picker {
-          width: 36px;
-          height: 36px;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-          padding: 0;
         }
 
         .checkbox-group {
