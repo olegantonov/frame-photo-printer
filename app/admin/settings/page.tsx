@@ -28,7 +28,8 @@ interface SystemConfig {
   hotspot_enabled: boolean;
   hotspot_ssid: string;
   hotspot_password: string;
-  frame_image: string | null;
+  frame_portrait: string | null;
+  frame_landscape: string | null;
   frame_show_id: boolean;
   frame_show_datetime: boolean;
 }
@@ -40,9 +41,10 @@ export default function SettingsPage() {
   const [selectedPrinter, setSelectedPrinter] = useState('');
   const [ssid, setSsid] = useState('FramePhotoPrinter');
   const [password, setPassword] = useState('foto1234');
-  // Frame settings
+  // Frame settings - separate for portrait and landscape
   const [frames, setFrames] = useState<FrameOption[]>([]);
-  const [selectedFrame, setSelectedFrame] = useState<string | null>(null);
+  const [framePortrait, setFramePortrait] = useState<string | null>(null);
+  const [frameLandscape, setFrameLandscape] = useState<string | null>(null);
   const [showId, setShowId] = useState(true);
   const [showDateTime, setShowDateTime] = useState(true);
   const [uploadingFrame, setUploadingFrame] = useState(false);
@@ -73,7 +75,8 @@ export default function SettingsPage() {
         setSelectedPrinter(data.default_printer || '');
         setSsid(data.hotspot_ssid || 'FramePhotoPrinter');
         setPassword(data.hotspot_password || 'foto1234');
-        setSelectedFrame(data.frame_image || null);
+        setFramePortrait(data.frame_portrait || null);
+        setFrameLandscape(data.frame_landscape || null);
         setShowId(data.frame_show_id ?? true);
         setShowDateTime(data.frame_show_datetime ?? true);
       }
@@ -130,7 +133,8 @@ export default function SettingsPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          frame_image: selectedFrame,
+          frame_portrait: framePortrait,
+          frame_landscape: frameLandscape,
           frame_show_id: showId,
           frame_show_datetime: showDateTime
         })
@@ -162,9 +166,7 @@ export default function SettingsPage() {
       });
 
       if (response.ok) {
-        const data = await response.json();
         setMessage('✅ Moldura enviada com sucesso!');
-        setSelectedFrame(data.frame.path);
         fetchData();
       } else {
         const data = await response.json();
@@ -180,6 +182,8 @@ export default function SettingsPage() {
   const deleteFrame = async (frameName: string) => {
     if (!confirm(`Deseja excluir a moldura "${frameName}"?`)) return;
     
+    const framePath = `/frames/${frameName}`;
+    
     try {
       const response = await fetch(`/api/frames?name=${encodeURIComponent(frameName)}`, {
         method: 'DELETE'
@@ -187,9 +191,9 @@ export default function SettingsPage() {
 
       if (response.ok) {
         setMessage('✅ Moldura excluída!');
-        if (selectedFrame === `/frames/${frameName}`) {
-          setSelectedFrame(null);
-        }
+        // Clear selection if deleted frame was selected
+        if (framePortrait === framePath) setFramePortrait(null);
+        if (frameLandscape === framePath) setFrameLandscape(null);
         fetchData();
       } else {
         setMessage('❌ Erro ao excluir moldura');
@@ -318,41 +322,47 @@ export default function SettingsPage() {
 
         {/* Frame Settings Section */}
         <section className="settings-card">
-          <h2>🖼️ Configuração da Moldura</h2>
+          <h2>🖼️ Configuração das Molduras</h2>
           <p className="settings-description">
-            Selecione ou envie uma moldura PNG com fundo transparente (formato 15×21cm recomendado).
+            Configure molduras separadas para fotos em retrato (vertical) e paisagem (horizontal).
           </p>
 
-          {/* Frame Preview */}
-          <div className="frame-preview-container">
-            {selectedFrame ? (
-              <div className="frame-preview-image">
-                <img src={selectedFrame} alt="Moldura selecionada" />
-                <div className="preview-photo-placeholder">📷</div>
-              </div>
-            ) : (
-              <div className="frame-preview no-frame">
-                <div className="preview-photo">
-                  <span>📷 Foto</span>
+          {/* Dual Frame Preview */}
+          <div className="dual-frame-preview">
+            <div className="frame-preview-box">
+              <h3>📱 Retrato (15×21)</h3>
+              {framePortrait ? (
+                <div className="frame-preview-image portrait">
+                  <img src={framePortrait} alt="Moldura retrato" />
                 </div>
-                <p className="no-frame-text">Nenhuma moldura selecionada (borda branca simples)</p>
-              </div>
-            )}
-            {(showId || showDateTime) && (
-              <div className="preview-overlay">
-                {showId && 'ABC123'}{showId && showDateTime && ' | '}{showDateTime && '08/04/2026 12:00'}
-              </div>
-            )}
+              ) : (
+                <div className="frame-preview no-frame portrait">
+                  <span>Sem moldura</span>
+                </div>
+              )}
+            </div>
+            <div className="frame-preview-box">
+              <h3>🖼️ Paisagem (21×15)</h3>
+              {frameLandscape ? (
+                <div className="frame-preview-image landscape">
+                  <img src={frameLandscape} alt="Moldura paisagem" />
+                </div>
+              ) : (
+                <div className="frame-preview no-frame landscape">
+                  <span>Sem moldura</span>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Available Frames */}
           <div className="frame-settings">
+            {/* Portrait Frame Selection */}
             <div className="form-group">
-              <label>Molduras Disponíveis</label>
+              <label>📱 Moldura para Retrato (Vertical)</label>
               <div className="frames-grid">
                 <label 
-                  className={`frame-option ${!selectedFrame ? 'selected' : ''}`}
-                  onClick={() => setSelectedFrame(null)}
+                  className={`frame-option ${!framePortrait ? 'selected' : ''}`}
+                  onClick={() => setFramePortrait(null)}
                 >
                   <div className="frame-thumb no-frame-thumb">
                     <span>Sem moldura</span>
@@ -360,22 +370,37 @@ export default function SettingsPage() {
                 </label>
                 {frames.map(frame => (
                   <label 
-                    key={frame.name}
-                    className={`frame-option ${selectedFrame === frame.path ? 'selected' : ''}`}
+                    key={`portrait-${frame.name}`}
+                    className={`frame-option ${framePortrait === frame.path ? 'selected' : ''}`}
+                    onClick={() => setFramePortrait(frame.path)}
                   >
-                    <img 
-                      src={frame.path} 
-                      alt={frame.displayName}
-                      onClick={() => setSelectedFrame(frame.path)}
-                    />
+                    <img src={frame.path} alt={frame.displayName} />
                     <span className="frame-name">{frame.displayName}</span>
-                    <button 
-                      className="delete-frame-btn"
-                      onClick={(e) => { e.stopPropagation(); deleteFrame(frame.name); }}
-                      title="Excluir moldura"
-                    >
-                      🗑️
-                    </button>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Landscape Frame Selection */}
+            <div className="form-group">
+              <label>🖼️ Moldura para Paisagem (Horizontal)</label>
+              <div className="frames-grid">
+                <label 
+                  className={`frame-option ${!frameLandscape ? 'selected' : ''}`}
+                  onClick={() => setFrameLandscape(null)}
+                >
+                  <div className="frame-thumb no-frame-thumb">
+                    <span>Sem moldura</span>
+                  </div>
+                </label>
+                {frames.map(frame => (
+                  <label 
+                    key={`landscape-${frame.name}`}
+                    className={`frame-option ${frameLandscape === frame.path ? 'selected' : ''}`}
+                    onClick={() => setFrameLandscape(frame.path)}
+                  >
+                    <img src={frame.path} alt={frame.displayName} />
+                    <span className="frame-name">{frame.displayName}</span>
                   </label>
                 ))}
               </div>
@@ -383,7 +408,7 @@ export default function SettingsPage() {
 
             {/* Upload Frame */}
             <div className="form-group">
-              <label>Enviar Nova Moldura</label>
+              <label>📤 Enviar Nova Moldura</label>
               <div className="upload-area">
                 <input
                   type="file"
@@ -393,6 +418,7 @@ export default function SettingsPage() {
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) uploadFrame(file);
+                    e.target.value = '';
                   }}
                   disabled={uploadingFrame}
                 />
@@ -400,6 +426,23 @@ export default function SettingsPage() {
                   {uploadingFrame ? '⏳ Enviando...' : '📤 Selecionar arquivo PNG'}
                 </label>
               </div>
+              {frames.length > 0 && (
+                <div className="frames-manage">
+                  <p className="small-text">Molduras disponíveis:</p>
+                  <div className="frames-list">
+                    {frames.map(frame => (
+                      <span key={frame.name} className="frame-tag">
+                        {frame.displayName}
+                        <button 
+                          onClick={() => deleteFrame(frame.name)}
+                          className="delete-tag"
+                          title="Excluir"
+                        >×</button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="form-group">
@@ -430,7 +473,7 @@ export default function SettingsPage() {
             className="btn btn-primary btn-large"
             disabled={savingFrame}
           >
-            {savingFrame ? '⏳ Salvando...' : '💾 Salvar Moldura'}
+            {savingFrame ? '⏳ Salvando...' : '💾 Salvar Configurações de Moldura'}
           </button>
         </section>
 
@@ -687,6 +730,26 @@ export default function SettingsPage() {
         }
 
         /* Frame Settings Styles */
+        .dual-frame-preview {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1rem;
+          margin-bottom: 1.5rem;
+        }
+
+        .frame-preview-box {
+          background: #0f172a;
+          border-radius: 12px;
+          padding: 1rem;
+          text-align: center;
+        }
+
+        .frame-preview-box h3 {
+          font-size: 0.9rem;
+          margin-bottom: 0.75rem;
+          color: #94a3b8;
+        }
+
         .frame-preview-container {
           position: relative;
           margin-bottom: 1.5rem;
@@ -697,15 +760,22 @@ export default function SettingsPage() {
           display: flex;
           justify-content: center;
           align-items: center;
-          background: #0f172a;
+          background: #1e293b;
           border-radius: 8px;
-          padding: 1rem;
-          min-height: 200px;
+          padding: 0.5rem;
+        }
+
+        .frame-preview-image.portrait {
+          min-height: 140px;
+        }
+
+        .frame-preview-image.landscape {
+          min-height: 100px;
         }
 
         .frame-preview-image img {
-          max-width: 180px;
-          max-height: 250px;
+          max-width: 100%;
+          max-height: 120px;
           object-fit: contain;
         }
 
@@ -714,6 +784,71 @@ export default function SettingsPage() {
           font-size: 3rem;
           z-index: 0;
           opacity: 0.5;
+        }
+
+        .frame-preview {
+          border-radius: 8px;
+          padding: 1rem;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: #1e293b;
+          min-height: 100px;
+        }
+
+        .frame-preview.portrait {
+          min-height: 140px;
+        }
+
+        .frame-preview.no-frame {
+          border: 2px dashed #475569;
+        }
+
+        .frame-preview.no-frame span {
+          color: #64748b;
+          font-size: 0.8rem;
+        }
+
+        .frames-manage {
+          margin-top: 1rem;
+          padding-top: 1rem;
+          border-top: 1px solid #334155;
+        }
+
+        .small-text {
+          font-size: 0.8rem;
+          color: #64748b;
+          margin-bottom: 0.5rem;
+        }
+
+        .frames-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+
+        .frame-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
+          padding: 0.25rem 0.5rem;
+          background: #334155;
+          border-radius: 4px;
+          font-size: 0.8rem;
+        }
+
+        .delete-tag {
+          background: none;
+          border: none;
+          color: #ef4444;
+          cursor: pointer;
+          font-size: 1rem;
+          padding: 0 0.25rem;
+        }
+
+        .delete-tag:hover {
+          color: #f87171;
         }
 
         .frame-preview {

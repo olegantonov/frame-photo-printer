@@ -89,11 +89,29 @@ model SystemConfig {
   hotspot_enabled Boolean @default(false)
   hotspot_ssid    String  @default("FramePhotoPrinter")
   hotspot_password String @default("foto1234")
-  // Frame settings
-  frame_image     String? // Path to frame PNG image
+  // Frame settings - separate frames for each orientation
+  frame_portrait  String? // Path to portrait frame PNG (15x21)
+  frame_landscape String? // Path to landscape frame PNG (21x15)
   frame_show_id     Boolean @default(true)
   frame_show_datetime Boolean @default(true)
   updated_at DateTime @updatedAt
   
   @@map("system_config")
+}
+
+// Print queue for reliable high-volume printing
+model PrintJob {
+  id          String   @id @default(uuid())
+  photo_id    String
+  printer_name String
+  copies      Int      @default(1)
+  status      String   @default("pending") // pending, processing, completed, failed
+  error       String?
+  created_at  DateTime @default(now())
+  processed_at DateTime?
+  completed_at DateTime?
+  
+  @@index([status])
+  @@index([created_at])
+  @@map("print_jobs")
 }

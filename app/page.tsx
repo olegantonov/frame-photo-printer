@@ -12,6 +12,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [configLoading, setConfigLoading] = useState(true);
+  const [customCopies, setCustomCopies] = useState(1);
 
   useEffect(() => {
     // Load system config to get default printer
@@ -41,35 +42,45 @@ export default function Home() {
     setStep('preview');
   };
 
-  const handlePrint = async () => {
+  const handlePrint = async (copies: number) => {
     if (!defaultPrinter) {
       setMessage('⚠️ Nenhuma impressora configurada. Acesse /admin para configurar.');
       return;
     }
 
+    if (copies < 1 || copies > 10) {
+      setMessage('⚠️ Número de cópias deve ser entre 1 e 10');
+      return;
+    }
+
     setIsLoading(true);
-    setMessage('🖨️ Enviando para impressão...');
+    setMessage(`🖨️ Enviando ${copies} cópia${copies > 1 ? 's' : ''} para impressão...`);
 
     try {
-      const response = await fetch('/api/print', {
+      const response = await fetch('/api/print-queue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photoId, printerName: defaultPrinter }),
+        body: JSON.stringify({ 
+          photoId, 
+          printerName: defaultPrinter,
+          copies 
+        }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setMessage('✅ Foto impressa com sucesso!');
+        setMessage(`✅ ${data.message}`);
+        setStep('printing');
         setTimeout(() => {
           resetToCamera();
-        }, 2000);
+        }, 3000);
       } else {
-        setMessage(`❌ Erro: ${data.details || data.error}`);
+        setMessage(`❌ Erro: ${data.error}`);
       }
     } catch (error) {
       console.error('Print failed:', error);
-      setMessage('❌ Erro ao imprimir');
+      setMessage('❌ Erro ao enviar para impressão');
     } finally {
       setIsLoading(false);
     }
@@ -80,6 +91,7 @@ export default function Home() {
     setPhotoId('');
     setPreviewUrl('');
     setMessage('');
+    setCustomCopies(1);
   };
 
   if (configLoading) {
@@ -136,21 +148,74 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="action-buttons-vertical">
-              <button
-                onClick={handlePrint}
-                className="btn btn-success btn-xlarge"
-                disabled={!defaultPrinter || isLoading}
-              >
-                {isLoading ? '⏳ Imprimindo...' : '🖨️ IMPRIMIR'}
-              </button>
-              <button
-                onClick={resetToCamera}
-                className="btn btn-secondary btn-large"
-                disabled={isLoading}
-              >
-                🔄 Nova Foto
-              </button>
+            {/* Quick print buttons */}
+            <div className="print-options">
+              <p className="print-label">Imprimir cópias:</p>
+              <div className="quick-print-buttons">
+                {[1, 2, 3, 4, 5].map((num) => (
+                  <button
+                    key={num}
+                    onClick={() => handlePrint(num)}
+                    className="btn btn-print-quick"
+                    disabled={!defaultPrinter || isLoading}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+              
+              <div className="custom-copies">
+                <label>Ou escolha a quantidade:</label>
+                <div className="custom-copies-input">
+                  <button 
+                    onClick={() => setCustomCopies(Math.max(1, customCopies - 1))}
+                    className="btn btn-small"
+                    disabled={isLoading}
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={customCopies}
+                    onChange={(e) => setCustomCopies(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))}
+                    className="copies-input"
+                    disabled={isLoading}
+                  />
+                  <button 
+                    onClick={() => setCustomCopies(Math.min(10, customCopies + 1))}
+                    className="btn btn-small"
+                    disabled={isLoading}
+                  >
+                    +
+                  </button>
+                  <button
+                    onClick={() => handlePrint(customCopies)}
+                    className="btn btn-success"
+                    disabled={!defaultPrinter || isLoading}
+                  >
+                    {isLoading ? '⏳' : '🖨️'} Imprimir
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={resetToCamera}
+              className="btn btn-secondary btn-large"
+              disabled={isLoading}
+            >
+              🔄 Nova Foto
+            </button>
+          </div>
+        )}
+
+        {step === 'printing' && (
+          <div className="printing-section">
+            <div className="printing-animation">
+              <div className="printer-icon">🖨️</div>
+              <p>Impressão em andamento...</p>
             </div>
           </div>
         )}

@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
       });
       if (config) {
         frameConfig = {
-          frame_image: config.frame_image,
+          frame_portrait: config.frame_portrait,
+          frame_landscape: config.frame_landscape,
           frame_show_id: config.frame_show_id,
           frame_show_datetime: config.frame_show_datetime,
         };

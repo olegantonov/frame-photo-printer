@@ -3,7 +3,8 @@ import path from 'path';
 import { promises as fs } from 'fs';
 
 export interface FrameConfig {
-  frame_image: string | null;
+  frame_portrait: string | null;
+  frame_landscape: string | null;
   frame_show_id: boolean;
   frame_show_datetime: boolean;
 }
@@ -62,7 +63,10 @@ export async function applyFrame(
 ): Promise<Buffer> {
   const showId = config?.frame_show_id ?? true;
   const showDateTime = config?.frame_show_datetime ?? true;
-  const frameImagePath = config?.frame_image;
+  // Select frame based on orientation
+  const frameImagePath = orientation === 'portrait' 
+    ? config?.frame_portrait 
+    : config?.frame_landscape;
   
   // Final dimensions for 15x21cm at 100 DPI
   const frameWidth = orientation === 'portrait' ? 1500 : 2100;
