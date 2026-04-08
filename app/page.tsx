@@ -2,40 +2,23 @@
 
 import { useState } from 'react';
 import CameraCapture from '@/components/CameraCapture';
-import FrameSelector from '@/components/FrameSelector';
 import PrinterSettings from '@/components/PrinterSettings';
 
 export default function Home() {
-  const [step, setStep] = useState<'camera' | 'frame' | 'printer' | 'preview'>('camera');
+  const [step, setStep] = useState<'camera' | 'preview' | 'printing'>('camera');
   const [photoId, setPhotoId] = useState('');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [previewUrl, setPreviewUrl] = useState('');
   const [selectedPrinter, setSelectedPrinter] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState('');
 
-  const handlePhotoCaptured = (id: string, orient: string) => {
+  const handlePhotoCaptured = async (id: string, orient: string, preview: string) => {
     setPhotoId(id);
     setOrientation(orient as 'portrait' | 'landscape');
-    setStep('frame');
-  };
-
-  const handleOrientationSelected = async (orient: 'portrait' | 'landscape') => {
-    setOrientation(orient);
-    setIsLoading(true);
-
-    try {
-      await fetch('/api/frame', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photoId, orientation: orient }),
-      });
-
-      setStep('printer');
-    } catch (error) {
-      console.error('Frame application failed:', error);
-      alert('Falha ao aplicar moldura');
-    } finally {
-      setIsLoading(false);
-    }
+    setPreviewUrl(preview);
+    setMessage(`📸 Foto capturada em modo ${orient === 'portrait' ? 'Retrato' : 'Paisagem'}`);
+    setStep('preview');
   };
 
   const handlePrinterSelected = (printerName: string) => {
@@ -43,7 +26,13 @@ export default function Home() {
   };
 
   const handlePrint = async () => {
+    if (!selectedPrinter || selectedPrinter.includes('Nenhuma')) {
+      setMessage('⚠️ Selecione uma impressora válida');
+      return;
+    }
+
     setIsLoading(true);
+    setMessage('🖨️ Enviando para impressão...');
 
     try {
       const response = await fetch('/api/print', {
@@ -52,54 +41,92 @@ export default function Home() {
         body: JSON.stringify({ photoId, printerName: selectedPrinter }),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
-        alert('Foto enviada para impressão com sucesso');
-        setStep('camera');
-        setPhotoId('');
+        setMessage('✅ Foto impressa com sucesso!');
+        setTimeout(() => {
+          resetToCamera();
+        }, 2000);
       } else {
-        alert('Falha ao enviar para impressão');
+        setMessage(`❌ Erro: ${data.details || data.error}`);
       }
     } catch (error) {
       console.error('Print failed:', error);
-      alert('Erro ao imprimir');
+      setMessage('❌ Erro ao imprimir');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const resetToCamera = () => {
+    setStep('camera');
+    setPhotoId('');
+    setPreviewUrl('');
+    setMessage('');
+  };
+
   return (
-    <main className="container">
-      <h1 className="title">Frame Photo Printer</h1>
+    <main className="app-container">
+      <header className="app-header">
+        <h1>📸 Frame Photo Printer</h1>
+        <p className="subtitle">Capture, enquadre e imprima suas fotos 15x21</p>
+      </header>
 
-      <div className="section">
-        {step === 'camera' && <CameraCapture onCaptured={handlePhotoCaptured} />}
+      {message && (
+        <div className={`message-banner ${message.includes('✅') ? 'success' : message.includes('❌') ? 'error' : 'info'}`}>
+          {message}
+        </div>
+      )}
 
-        {step === 'frame' && (
-          <FrameSelector onOrientationSelected={handleOrientationSelected} />
+      <div className="main-content">
+        {step === 'camera' && (
+          <CameraCapture onCaptured={handlePhotoCaptured} />
         )}
 
-        {step === 'printer' && (
-          <>
-            <PrinterSettings onPrinterSelected={handlePrinterSelected} />
-            <div className="button-group" style={{ marginTop: '2rem' }}>
-              <button
-                onClick={() => setStep('camera')}
-                className="btn btn-secondary btn-large"
-                disabled={isLoading}
-              >
-                ⬅️ Voltar
-              </button>
-              <button
-                onClick={handlePrint}
-                className="btn btn-success btn-large"
-                disabled={!selectedPrinter || isLoading}
-              >
-                {isLoading ? '⏳ Enviando...' : '🖨️ Imprimir'}
-              </button>
+        {step === 'preview' && (
+          <div className="preview-section">
+            <div className="photo-preview-container">
+              <h2>📷 Prévia da Foto</h2>
+              <div className={`photo-frame ${orientation}`}>
+                <img 
+                  src={previewUrl} 
+                  alt="Preview" 
+                  className="photo-preview-img"
+                />
+              </div>
+              <p className="orientation-badge">
+                {orientation === 'portrait' ? '📱 Retrato 15×21' : '🖼️ Paisagem 21×15'}
+              </p>
             </div>
-          </>
+
+            <div className="print-section">
+              <PrinterSettings onPrinterSelected={handlePrinterSelected} />
+              
+              <div className="action-buttons">
+                <button
+                  onClick={resetToCamera}
+                  className="btn btn-secondary btn-large"
+                  disabled={isLoading}
+                >
+                  🔄 Nova Foto
+                </button>
+                <button
+                  onClick={handlePrint}
+                  className="btn btn-success btn-large"
+                  disabled={!selectedPrinter || isLoading}
+                >
+                  {isLoading ? '⏳ Imprimindo...' : '🖨️ Imprimir'}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
+
+      <footer className="app-footer">
+        <p>Moldura aplicada automaticamente • 15×21 cm</p>
+      </footer>
     </main>
   );
 }
