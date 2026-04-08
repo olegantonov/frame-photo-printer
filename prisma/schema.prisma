@@ -89,6 +89,11 @@ model SystemConfig {
   hotspot_enabled Boolean @default(false)
   hotspot_ssid    String  @default("FramePhotoPrinter")
   hotspot_password String @default("foto1234")
+  // Frame settings
+  frame_border_size Int     @default(40)
+  frame_bg_color    String  @default("#FFFFFF")
+  frame_show_id     Boolean @default(true)
+  frame_show_datetime Boolean @default(true)
   updated_at DateTime @updatedAt
   
   @@map("system_config")

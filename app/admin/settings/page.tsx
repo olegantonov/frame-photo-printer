@@ -22,6 +22,10 @@ interface SystemConfig {
   hotspot_enabled: boolean;
   hotspot_ssid: string;
   hotspot_password: string;
+  frame_border_size: number;
+  frame_bg_color: string;
+  frame_show_id: boolean;
+  frame_show_datetime: boolean;
 }
 
 export default function SettingsPage() {
@@ -31,8 +35,15 @@ export default function SettingsPage() {
   const [selectedPrinter, setSelectedPrinter] = useState('');
   const [ssid, setSsid] = useState('FramePhotoPrinter');
   const [password, setPassword] = useState('foto1234');
+  // Frame settings
+  const [borderSize, setBorderSize] = useState(40);
+  const [bgColor, setBgColor] = useState('#FFFFFF');
+  const [showId, setShowId] = useState(true);
+  const [showDateTime, setShowDateTime] = useState(true);
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingFrame, setSavingFrame] = useState(false);
   const [hotspotLoading, setHotspotLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -55,6 +66,10 @@ export default function SettingsPage() {
         setSelectedPrinter(data.default_printer || '');
         setSsid(data.hotspot_ssid || 'FramePhotoPrinter');
         setPassword(data.hotspot_password || 'foto1234');
+        setBorderSize(data.frame_border_size ?? 40);
+        setBgColor(data.frame_bg_color || '#FFFFFF');
+        setShowId(data.frame_show_id ?? true);
+        setShowDateTime(data.frame_show_datetime ?? true);
       }
 
       if (hotspotRes.ok) {
@@ -93,6 +108,34 @@ export default function SettingsPage() {
       setMessage('❌ Erro ao salvar impressora');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveFrameSettings = async () => {
+    setSavingFrame(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          frame_border_size: borderSize,
+          frame_bg_color: bgColor,
+          frame_show_id: showId,
+          frame_show_datetime: showDateTime
+        })
+      });
+
+      if (response.ok) {
+        setMessage('✅ Configurações da moldura salvas!');
+        fetchData();
+      } else {
+        setMessage('❌ Erro ao salvar moldura');
+      }
+    } catch (error) {
+      setMessage('❌ Erro ao salvar moldura');
+    } finally {
+      setSavingFrame(false);
     }
   };
 
@@ -211,6 +254,96 @@ export default function SettingsPage() {
               ⚠️ Nenhuma impressora encontrada. Verifique se o CUPS está instalado e configurado.
             </p>
           )}
+        </section>
+
+        {/* Frame Settings Section */}
+        <section className="settings-card">
+          <h2>🖼️ Configuração da Moldura</h2>
+          <p className="settings-description">
+            Configure a aparência da moldura aplicada às fotos (formato 15×21cm).
+          </p>
+
+          <div className="frame-preview" style={{ 
+            border: `${Math.min(borderSize / 4, 20)}px solid ${bgColor}`,
+            backgroundColor: bgColor
+          }}>
+            <div className="preview-photo">
+              <span>📷 Foto</span>
+            </div>
+            {(showId || showDateTime) && (
+              <div className="preview-overlay">
+                {showId && 'ABC123'}{showId && showDateTime && ' | '}{showDateTime && '08/04/2026 12:00'}
+              </div>
+            )}
+          </div>
+
+          <div className="frame-settings">
+            <div className="form-group">
+              <label>Tamanho da Borda (px)</label>
+              <div className="range-group">
+                <input
+                  type="range"
+                  min="10"
+                  max="100"
+                  value={borderSize}
+                  onChange={(e) => setBorderSize(Number(e.target.value))}
+                />
+                <span className="range-value">{borderSize}px</span>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Cor de Fundo</label>
+              <div className="color-options">
+                {['#FFFFFF', '#000000', '#F5F5DC', '#FFE4E1', '#E6E6FA', '#F0FFF0'].map(color => (
+                  <button
+                    key={color}
+                    className={`color-btn ${bgColor === color ? 'selected' : ''}`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setBgColor(color)}
+                    title={color}
+                  />
+                ))}
+                <input
+                  type="color"
+                  value={bgColor}
+                  onChange={(e) => setBgColor(e.target.value)}
+                  className="color-picker"
+                  title="Cor personalizada"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Informações na Foto</label>
+              <div className="checkbox-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={showId}
+                    onChange={(e) => setShowId(e.target.checked)}
+                  />
+                  <span>Mostrar ID da foto (ex: ABC123)</span>
+                </label>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={showDateTime}
+                    onChange={(e) => setShowDateTime(e.target.checked)}
+                  />
+                  <span>Mostrar data e hora</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <button 
+            onClick={saveFrameSettings}
+            className="btn btn-primary btn-large"
+            disabled={savingFrame}
+          >
+            {savingFrame ? '⏳ Salvando...' : '💾 Salvar Moldura'}
+          </button>
         </section>
 
         {/* Hotspot Section */}
@@ -463,6 +596,137 @@ export default function SettingsPage() {
           background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
           color: white;
           box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+        }
+
+        /* Frame Settings Styles */
+        .frame-preview {
+          border-radius: 8px;
+          padding: 1rem;
+          margin-bottom: 1.5rem;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          position: relative;
+        }
+
+        .preview-photo {
+          width: 120px;
+          height: 160px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-size: 1.5rem;
+        }
+
+        .preview-overlay {
+          position: absolute;
+          top: 8px;
+          right: 12px;
+          font-size: 10px;
+          color: #888;
+          font-family: Arial, sans-serif;
+        }
+
+        .frame-settings {
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+          margin-bottom: 1.5rem;
+        }
+
+        .range-group {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
+
+        .range-group input[type="range"] {
+          flex: 1;
+          height: 8px;
+          background: #334155;
+          border-radius: 4px;
+          -webkit-appearance: none;
+          padding: 0;
+        }
+
+        .range-group input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          width: 20px;
+          height: 20px;
+          background: #3b82f6;
+          border-radius: 50%;
+          cursor: pointer;
+        }
+
+        .range-value {
+          min-width: 50px;
+          text-align: right;
+          font-weight: 600;
+          color: #3b82f6;
+        }
+
+        .color-options {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+          align-items: center;
+        }
+
+        .color-btn {
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
+          border: 2px solid transparent;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .color-btn:hover {
+          transform: scale(1.1);
+        }
+
+        .color-btn.selected {
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+        }
+
+        .color-picker {
+          width: 36px;
+          height: 36px;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          padding: 0;
+        }
+
+        .checkbox-group {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+
+        .checkbox-label {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          cursor: pointer;
+          padding: 0.5rem;
+          border-radius: 8px;
+          transition: background 0.2s;
+        }
+
+        .checkbox-label:hover {
+          background: rgba(59, 130, 246, 0.1);
+        }
+
+        .checkbox-label input[type="checkbox"] {
+          width: 20px;
+          height: 20px;
+          accent-color: #3b82f6;
+          padding: 0;
         }
 
         .qr-section {

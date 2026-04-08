@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { applyFrame, detectImageOrientation } from '@/lib/frameRenderer';
+import { applyFrame, detectImageOrientation, FrameConfig } from '@/lib/frameRenderer';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +15,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get frame config from database
+    let frameConfig: FrameConfig | undefined;
+    try {
+      const config = await prisma.systemConfig.findUnique({
+        where: { id: 'system' }
+      });
+      if (config) {
+        frameConfig = {
+          frame_border_size: config.frame_border_size,
+          frame_bg_color: config.frame_bg_color,
+          frame_show_id: config.frame_show_id,
+          frame_show_datetime: config.frame_show_datetime,
+        };
+      }
+    } catch (e) {
+      console.warn('Could not load frame config, using defaults');
+    }
+
     // Convert base64 to buffer
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
@@ -21,8 +40,8 @@ export async function POST(request: NextRequest) {
     // Detect orientation automatically
     const orientation = await detectImageOrientation(buffer);
 
-    // Apply frame automatically
-    const framedImageBuffer = await applyFrame(buffer, orientation, 40);
+    // Apply frame with config
+    const framedImageBuffer = await applyFrame(buffer, orientation, frameConfig);
 
     const photoId = uuidv4();
     await pool.query(
